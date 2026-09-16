@@ -1,6 +1,7 @@
 import { Role } from "@prisma/client"
 import { toTaskResponse } from "../dto/task.dto"
 import { HTTPException } from "../errors/http.error"
+import { taskPolicy } from "../policies/task.policy"
 import { projectRepository } from "../repositories/project.repository"
 import { taskRepository } from "../repositories/task.repository"
 import type { CreateTaskInput, TaskQueryParams, UpdateTaskInput } from "../schemas/task.schema"
@@ -18,12 +19,8 @@ export class TaskService {
       throw new HTTPException(404, "Project not found")
     }
 
-    if (currentUser.role !== Role.PM) {
-      const isMember = await projectRepository.isMember(projectId, currentUser.userId)
-      if (!isMember) {
-        throw new HTTPException(403, "Access denied to project tasks")
-      }
-    }
+    const isMember = await projectRepository.isMember(projectId, currentUser.userId)
+    taskPolicy.canViewTask(currentUser, project.company_id, isMember, true)
 
     const isClient = currentUser.role === Role.CLIENT
     const tasks = await taskRepository.findByProjectId(projectId, params, isClient)
@@ -41,16 +38,8 @@ export class TaskService {
       throw new HTTPException(404, "Project not found in your company")
     }
 
-    if (currentUser.role === Role.CLIENT && !task.client_visible) {
-      throw new HTTPException(403, "Access denied to internal task")
-    }
-
-    if (currentUser.role !== Role.PM) {
-      const isMember = await projectRepository.isMember(task.project_id, currentUser.userId)
-      if (!isMember) {
-        throw new HTTPException(403, "Access denied to this task")
-      }
-    }
+    const isMember = await projectRepository.isMember(task.project_id, currentUser.userId)
+    taskPolicy.canViewTask(currentUser, project.company_id, isMember, task.client_visible)
 
     return toTaskResponse(task)
   }
@@ -60,14 +49,12 @@ export class TaskService {
     input: CreateTaskInput,
     currentUser: JWTPayload,
   ): Promise<TaskResponse> {
-    if (currentUser.role !== Role.PM) {
-      throw new HTTPException(403, "Only Product Managers can create tasks")
-    }
-
     const project = await projectRepository.findById(projectId, currentUser.companyId)
     if (!project) {
       throw new HTTPException(404, "Project not found")
     }
+
+    taskPolicy.canCreateTask(currentUser, project.company_id)
 
     const task = await taskRepository.create(projectId, input)
     return toTaskResponse(task)
@@ -88,23 +75,24 @@ export class TaskService {
       throw new HTTPException(404, "Project not found in your company")
     }
 
-    const isPM = currentUser.role === Role.PM
-    if (!isPM) {
-      const isMember = await projectRepository.isMember(existingTask.project_id, currentUser.userId)
-      if (!isMember) {
-        throw new HTTPException(403, "Access denied to update this task")
-      }
-    }
+    const isMember = await projectRepository.isMember(existingTask.project_id, currentUser.userId)
+    const hasDescriptionChange = input.description !== undefined && input.description !== existingTask.description
+    const targetAssigneeId = input.assigneeId !== undefined ? input.assigneeId : existingTask.assignee_id
+
+    taskPolicy.canUpdateTask(
+      currentUser,
+      project.company_id,
+      isMember,
+      hasDescriptionChange,
+      targetAssigneeId,
+      input.status,
+    )
 
     const updated = await taskRepository.update(id, input)
     return toTaskResponse(updated)
   }
 
   async deleteTask(id: string, currentUser: JWTPayload): Promise<TaskResponse> {
-    if (currentUser.role !== Role.PM) {
-      throw new HTTPException(403, "Only Product Managers can delete tasks")
-    }
-
     const existingTask = await taskRepository.findById(id)
     if (!existingTask) {
       throw new HTTPException(404, "Task not found")
@@ -115,6 +103,7 @@ export class TaskService {
       throw new HTTPException(404, "Project not found in your company")
     }
 
+    taskPolicy.canDeleteTask(currentUser, project.company_id)
     const deleted = await taskRepository.softDelete(id)
     return toTaskResponse(deleted)
   }

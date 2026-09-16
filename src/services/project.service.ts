@@ -1,8 +1,9 @@
 import { Role } from "@prisma/client"
 import { toProjectMemberResponse, toProjectResponse } from "../dto/project.dto"
 import { HTTPException } from "../errors/http.error"
-import { userRepository } from "../repositories/user.repository"
+import { projectPolicy } from "../policies/project.policy"
 import { projectRepository } from "../repositories/project.repository"
+import { userRepository } from "../repositories/user.repository"
 import type { CreateProjectInput, ProjectQueryParams, UpdateProjectInput } from "../schemas/project.schema"
 import type { JWTPayload } from "../types/auth.types"
 import type { PaginatedResponse, ProjectMemberResponse, ProjectResponse } from "../types/project.types"
@@ -32,21 +33,14 @@ export class ProjectService {
       throw new HTTPException(404, "Project not found")
     }
 
-    if (currentUser.role !== Role.PM) {
-      const isMember = await projectRepository.isMember(id, currentUser.userId)
-      if (!isMember) {
-        throw new HTTPException(403, "Access denied to this project")
-      }
-    }
+    const isMember = await projectRepository.isMember(id, currentUser.userId)
+    projectPolicy.canViewProject(currentUser, project.company_id, isMember)
 
     return toProjectResponse(project)
   }
 
   async createProject(input: CreateProjectInput, currentUser: JWTPayload): Promise<ProjectResponse> {
-    if (currentUser.role !== Role.PM) {
-      throw new HTTPException(403, "Only Product Managers can create projects")
-    }
-
+    projectPolicy.canCreateProject(currentUser)
     const project = await projectRepository.create(currentUser.companyId, input, currentUser.userId)
     return toProjectResponse(project)
   }
@@ -56,29 +50,23 @@ export class ProjectService {
     input: UpdateProjectInput,
     currentUser: JWTPayload,
   ): Promise<ProjectResponse> {
-    if (currentUser.role !== Role.PM) {
-      throw new HTTPException(403, "Only Product Managers can update projects")
-    }
-
     const project = await projectRepository.findById(id, currentUser.companyId)
     if (!project) {
       throw new HTTPException(404, "Project not found")
     }
 
+    projectPolicy.canUpdateProject(currentUser, project.company_id)
     const updated = await projectRepository.update(id, input)
     return toProjectResponse(updated)
   }
 
   async deleteProject(id: string, currentUser: JWTPayload): Promise<ProjectResponse> {
-    if (currentUser.role !== Role.PM) {
-      throw new HTTPException(403, "Only Product Managers can delete projects")
-    }
-
     const project = await projectRepository.findById(id, currentUser.companyId)
     if (!project) {
       throw new HTTPException(404, "Project not found")
     }
 
+    projectPolicy.canDeleteProject(currentUser, project.company_id)
     const deleted = await projectRepository.softDelete(id)
     return toProjectResponse(deleted)
   }
@@ -89,12 +77,8 @@ export class ProjectService {
       throw new HTTPException(404, "Project not found")
     }
 
-    if (currentUser.role !== Role.PM) {
-      const isMember = await projectRepository.isMember(projectId, currentUser.userId)
-      if (!isMember) {
-        throw new HTTPException(403, "Access denied to project member list")
-      }
-    }
+    const isMember = await projectRepository.isMember(projectId, currentUser.userId)
+    projectPolicy.canViewProject(currentUser, project.company_id, isMember)
 
     const members = await projectRepository.findMembers(projectId)
     return members.map(toProjectMemberResponse)
@@ -105,14 +89,12 @@ export class ProjectService {
     targetUserId: string,
     currentUser: JWTPayload,
   ): Promise<ProjectMemberResponse> {
-    if (currentUser.role !== Role.PM) {
-      throw new HTTPException(403, "Only Product Managers can add project members")
-    }
-
     const project = await projectRepository.findById(projectId, currentUser.companyId)
     if (!project) {
       throw new HTTPException(404, "Project not found")
     }
+
+    projectPolicy.canManageMembers(currentUser, project.company_id)
 
     const targetUser = await userRepository.findById(targetUserId)
     if (!targetUser || targetUser.company_id !== currentUser.companyId) {
@@ -133,14 +115,12 @@ export class ProjectService {
     targetUserId: string,
     currentUser: JWTPayload,
   ): Promise<void> {
-    if (currentUser.role !== Role.PM) {
-      throw new HTTPException(403, "Only Product Managers can remove project members")
-    }
-
     const project = await projectRepository.findById(projectId, currentUser.companyId)
     if (!project) {
       throw new HTTPException(404, "Project not found")
     }
+
+    projectPolicy.canManageMembers(currentUser, project.company_id)
 
     const isMember = await projectRepository.isMember(projectId, targetUserId)
     if (!isMember) {
