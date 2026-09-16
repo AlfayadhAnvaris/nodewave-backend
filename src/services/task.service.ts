@@ -1,9 +1,10 @@
-import { Role } from "@prisma/client"
+import { Role, TaskStatus } from "@prisma/client"
 import { toTaskResponse } from "../dto/task.dto"
 import { HTTPException } from "../errors/http.error"
 import { taskPolicy } from "../policies/task.policy"
 import { projectRepository } from "../repositories/project.repository"
 import { taskRepository } from "../repositories/task.repository"
+import { dependencyRepository } from "../repositories/dependency.repository"
 import type { CreateTaskInput, TaskQueryParams, UpdateTaskInput } from "../schemas/task.schema"
 import type { JWTPayload } from "../types/auth.types"
 import type { TaskResponse } from "../types/task.types"
@@ -87,6 +88,18 @@ export class TaskService {
       targetAssigneeId,
       input.status,
     )
+
+    if (input.status === TaskStatus.IN_PROGRESS) {
+      const unfinishedPrereqs = await dependencyRepository.getUnfinishedPrerequisites(id)
+      if (unfinishedPrereqs.length > 0) {
+        const titles = unfinishedPrereqs.map((t) => `"${t.title}" (${t.status})`).join(", ")
+        await taskRepository.update(id, { status: TaskStatus.BLOCKED })
+        throw new HTTPException(
+          400,
+          `Cannot move task to IN_PROGRESS. Prerequisite tasks are not DONE: ${titles}`,
+        )
+      }
+    }
 
     const updated = await taskRepository.update(id, input)
     return toTaskResponse(updated)
