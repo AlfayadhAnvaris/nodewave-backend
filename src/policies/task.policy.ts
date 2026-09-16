@@ -33,6 +33,10 @@ export class TaskPolicy {
   ): void {
     authPolicy.validateTenantAccess(user, projectCompanyId)
 
+    if (user.role === Role.CLIENT) {
+      throw new HTTPException(403, "Client users are not permitted to modify tasks")
+    }
+
     if (user.role !== Role.PM && !isMember) {
       throw new HTTPException(403, "Access denied to update this task")
     }
