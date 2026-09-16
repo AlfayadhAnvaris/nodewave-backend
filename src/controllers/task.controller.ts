@@ -50,6 +50,14 @@ export class TaskController {
     const result = await taskService.deleteTask(id, currentUser)
     return c.json(result, 200)
   }
+
+  async getAuditLogs(c: Context) {
+    const currentUser = getCurrentUser(c)
+    const id = c.req.param("id")
+    if (!id) throw new HTTPException(400, "Missing task ID")
+    const result = await taskService.getTaskAuditLogs(id, currentUser)
+    return c.json(result, 200)
+  }
 }
 
 export const taskController = new TaskController()
