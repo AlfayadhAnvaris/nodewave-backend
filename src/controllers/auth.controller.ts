@@ -27,6 +27,12 @@ export class AuthController {
     const result = await authService.getMe(currentUser.userId)
     return c.json(result, 200)
   }
+
+  async getCompanyUsers(c: Context) {
+    const currentUser = getCurrentUser(c)
+    const result = await authService.getCompanyUsers(currentUser.companyId)
+    return c.json(result, 200)
+  }
 }
 
 export const authController = new AuthController()

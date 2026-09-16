@@ -63,6 +63,11 @@ export class AuthService {
 
     return toUserResponse(user)
   }
+
+  async getCompanyUsers(companyId: string): Promise<UserResponse[]> {
+    const users = await userRepository.findCompanyUsers(companyId)
+    return users.map(toUserResponse)
+  }
 }
 
 export const authService = new AuthService()

@@ -43,6 +43,16 @@ export class UserRepository {
       })
     })
   }
+
+  async findCompanyUsers(companyId: string): Promise<User[]> {
+    return await prisma.user.findMany({
+      where: {
+        company_id: companyId,
+        deleted_at: null,
+      },
+      orderBy: { name: "asc" },
+    })
+  }
 }
 
 export const userRepository = new UserRepository()
