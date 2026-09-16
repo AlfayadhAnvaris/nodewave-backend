@@ -89,11 +89,13 @@ export class TaskService {
       input.status,
     )
 
+    const expectedVersion = input.version ?? existingTask.version
+
     if (input.status === TaskStatus.IN_PROGRESS) {
       const unfinishedPrereqs = await dependencyRepository.getUnfinishedPrerequisites(id)
       if (unfinishedPrereqs.length > 0) {
         const titles = unfinishedPrereqs.map((t) => `"${t.title}" (${t.status})`).join(", ")
-        await taskRepository.update(id, { status: TaskStatus.BLOCKED })
+        await taskRepository.updateWithLock(id, expectedVersion, { status: TaskStatus.BLOCKED })
         throw new HTTPException(
           400,
           `Cannot move task to IN_PROGRESS. Prerequisite tasks are not DONE: ${titles}`,
@@ -101,7 +103,18 @@ export class TaskService {
       }
     }
 
-    const updated = await taskRepository.update(id, input)
+    const updated = await taskRepository.updateWithLock(id, expectedVersion, input)
+    if (!updated) {
+      const currentTask = await taskRepository.findById(id)
+      if (!currentTask) {
+        throw new HTTPException(404, "Task not found")
+      }
+      throw new HTTPException(
+        409,
+        "Conflict: Task has been modified by another user. Please refresh and try again.",
+      )
+    }
+
     return toTaskResponse(updated)
   }
 

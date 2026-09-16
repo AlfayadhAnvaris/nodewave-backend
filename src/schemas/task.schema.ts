@@ -16,6 +16,7 @@ export const updateTaskSchema = z.object({
   department: z.nativeEnum(Department).optional(),
   status: z.nativeEnum(TaskStatus).optional(),
   clientVisible: z.boolean().optional(),
+  version: z.number().int().optional(),
 })
 
 export const taskQuerySchema = z.object({

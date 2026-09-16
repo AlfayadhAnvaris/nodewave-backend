@@ -88,11 +88,42 @@ export class TaskRepository {
         ...(input.department !== undefined && { department: input.department }),
         ...(input.status !== undefined && { status: input.status }),
         ...(input.clientVisible !== undefined && { client_visible: input.clientVisible }),
+        version: { increment: 1 },
       },
       include: {
         assignee: true,
       },
     })
+  }
+
+  async updateWithLock(
+    id: string,
+    expectedVersion: number,
+    input: UpdateTaskInput,
+  ): Promise<(Task & { assignee: User | null }) | null> {
+    const { version, ...updateFields } = input
+    const result = await prisma.task.updateMany({
+      where: {
+        id,
+        version: expectedVersion,
+        deleted_at: null,
+      },
+      data: {
+        ...(updateFields.title !== undefined && { title: updateFields.title }),
+        ...(updateFields.description !== undefined && { description: updateFields.description }),
+        ...(updateFields.assigneeId !== undefined && { assignee_id: updateFields.assigneeId }),
+        ...(updateFields.department !== undefined && { department: updateFields.department }),
+        ...(updateFields.status !== undefined && { status: updateFields.status }),
+        ...(updateFields.clientVisible !== undefined && { client_visible: updateFields.clientVisible }),
+        version: { increment: 1 },
+      },
+    })
+
+    if (result.count === 0) {
+      return null
+    }
+
+    return await this.findById(id)
   }
 
   async softDelete(id: string): Promise<Task> {
