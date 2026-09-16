@@ -2,6 +2,7 @@ import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { errorHandler } from "./middlewares/error.middleware"
 import { authRoutes } from "./routes/auth.routes"
+import { projectRoutes } from "./routes/project.routes"
 
 export const app = new Hono()
 
@@ -21,3 +22,4 @@ app.get("/health", (c) => {
 })
 
 app.route("/auth", authRoutes)
+app.route("/projects", projectRoutes)
