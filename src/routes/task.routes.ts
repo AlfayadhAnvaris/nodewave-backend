@@ -1,4 +1,5 @@
 import { Hono } from "hono"
+import { attachmentController } from "../controllers/attachment.controller"
 import { dependencyController } from "../controllers/dependency.controller"
 import { taskController } from "../controllers/task.controller"
 import { authMiddleware } from "../middlewares/auth.middleware"
@@ -16,3 +17,7 @@ taskRoutes.post("/:id/dependencies", (c) => dependencyController.addDependency(c
 taskRoutes.delete("/:id/dependencies/:dependencyId", (c) => dependencyController.removeDependency(c))
 
 taskRoutes.get("/:id/audit-logs", (c) => taskController.getAuditLogs(c))
+
+taskRoutes.get("/:id/attachments", (c) => attachmentController.getAttachments(c))
+taskRoutes.post("/:id/attachments", (c) => attachmentController.addAttachment(c))
+taskRoutes.delete("/attachments/:attachmentId", (c) => attachmentController.deleteAttachment(c))
