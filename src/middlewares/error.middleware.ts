@@ -8,14 +8,15 @@ export function errorHandler(err: Error, c: Context) {
   }
 
   if (err instanceof ZodError) {
+    const issueMessages = err.errors.map((e) => e.message).join(", ")
     return c.json(
       {
-        error: "Validation failed",
+        error: issueMessages || "Validation failed",
         details: err.errors.map((e) => ({ path: e.path.join("."), message: e.message })),
       },
-      422,
+      400,
     )
   }
 
-  return c.json({ error: "Internal Server Error" }, 500)
+  return c.json({ error: err.message || "Internal Server Error" }, 500)
 }
