@@ -1,5 +1,6 @@
 import { Hono } from "hono"
 import { projectController } from "../controllers/project.controller"
+import { taskController } from "../controllers/task.controller"
 import { authMiddleware } from "../middlewares/auth.middleware"
 
 export const projectRoutes = new Hono()
@@ -15,3 +16,6 @@ projectRoutes.delete("/:id", (c) => projectController.deleteProject(c))
 projectRoutes.get("/:id/members", (c) => projectController.getMembers(c))
 projectRoutes.post("/:id/members", (c) => projectController.addMember(c))
 projectRoutes.delete("/:id/members/:userId", (c) => projectController.removeMember(c))
+
+projectRoutes.get("/:id/tasks", (c) => taskController.getTasksByProject(c))
+projectRoutes.post("/:id/tasks", (c) => taskController.createTask(c))
