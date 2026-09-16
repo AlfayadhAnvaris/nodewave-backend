@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PM
+  INTERNAL
+  CLIENT
+}
+
+enum Department {
+  PRODUCT
+  UI_UX
+  FRONTEND
+  BACKEND
+  CLIENT
+}
+
+enum TaskStatus {
+  TODO
+  BLOCKED
+  IN_PROGRESS
+  DONE
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+model Company {
+  id         String    @id @default(uuid())
+  name       String
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  users    User[]
+  projects Project[]
+
+  @@map("companies")
+}
+
+model User {
+  id            String     @id @default(uuid())
+  company_id    String
+  name          String
+  email         String     @unique
+  password_hash String
+  role          Role
+  department    Department
+  avatar_url    String?
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+  deleted_at    DateTime?
+
+  company         Company          @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  project_members ProjectMember[]
+  assigned_tasks  Task[]           @relation("TaskAssignee")
+  attachments     TaskAttachment[]
+  audit_logs      TaskAuditLog[]
+
+  @@index([company_id])
+  @@map("users")
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  company_id  String
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  deleted_at  DateTime?
+
+  company Company         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  members ProjectMember[]
+  tasks   Task[]
+
+  @@index([company_id])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id         String   @id @default(uuid())
+  project_id String
+  user_id    String
+  created_at DateTime @default(now())
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, user_id])
+  @@index([project_id])
+  @@index([user_id])
+  @@map("project_members")
+}
+
+model Task {
+  id             String     @id @default(uuid())
+  project_id     String
+  assignee_id    String?
+  title          String
+  description    String?
+  status         TaskStatus @default(TODO)
+  department     Department
+  client_visible Boolean    @default(false)
+  version        Int        @default(1)
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
+  deleted_at     DateTime?
+
+  project       Project          @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  assignee      User?            @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
+  dependencies  TaskDependency[] @relation("TaskDependencies")
+  prerequisites TaskDependency[] @relation("TaskPrerequisites")
+  attachments   TaskAttachment[]
+  audit_logs    TaskAuditLog[]
+
+  @@index([project_id])
+  @@index([assignee_id])
+  @@index([status])
+  @@map("tasks")
+}
+
+model TaskDependency {
+  id                 String   @id @default(uuid())
+  task_id            String
+  depends_on_task_id String
+  created_at         DateTime @default(now())
+
+  task            Task @relation("TaskDependencies", fields: [task_id], references: [id], onDelete: Cascade)
+  depends_on_task Task @relation("TaskPrerequisites", fields: [depends_on_task_id], references: [id], onDelete: Cascade)
+
+  @@unique([task_id, depends_on_task_id])
+  @@index([task_id])
+  @@index([depends_on_task_id])
+  @@map("task_dependencies")
+}
+
+model TaskAttachment {
+  id          String    @id @default(uuid())
+  task_id     String
+  uploaded_by String
+  file_name   String
+  file_url    String
+  created_at  DateTime  @default(now())
+  deleted_at  DateTime?
+
+  task     Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  uploader User @relation(fields: [uploaded_by], references: [id], onDelete: Cascade)
+
+  @@index([task_id])
+  @@index([uploaded_by])
+  @@map("task_attachments")
+}
+
+model TaskAuditLog {
+  id             String   @id @default(uuid())
+  task_id        String
+  user_id        String
+  changed_column String
+  old_value      String?
+  new_value      String?
+  created_at     DateTime @default(now())
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([task_id])
+  @@index([user_id])
+  @@map("task_audit_logs")
+}
