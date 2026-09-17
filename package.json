@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome lint ./src",
     "format": "biome format --write ./src",
+    "db:push": "prisma db push",
     "seed": "bun run prisma/seed.ts"
   },
   "prisma": {
